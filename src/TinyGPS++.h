@@ -143,6 +143,26 @@ private:
    void set(const char *term);
 };
 
+struct TinyGPSChar
+{
+   friend class TinyGPSPlus;
+public:
+   bool isValid() const    { return valid; }
+   bool isUpdated() const  { return updated; }
+   uint32_t age() const    { return valid ? millis() - lastCommitTime : (uint32_t)ULONG_MAX; }
+   char value()        { updated = false; return val; }
+
+   TinyGPSChar() : valid(false), updated(false), val(0)
+   {}
+
+private:
+   bool valid, updated;
+   uint32_t lastCommitTime;
+   char val, newval;
+   void commit();
+   void set(const char *term);
+};
+
 struct TinyGPSInteger
 {
    friend class TinyGPSPlus;
@@ -165,28 +185,28 @@ private:
 
 struct TinyGPSSpeed : TinyGPSDecimal
 {
-   double knots()    { return value() / 100.0; }
-   double mph()      { return _GPS_MPH_PER_KNOT * value() / 100.0; }
-   double mps()      { return _GPS_MPS_PER_KNOT * value() / 100.0; }
-   double kmph()     { return _GPS_KMPH_PER_KNOT * value() / 100.0; }
+   double knots()    { return (double)value() / 100.0; }
+   double mph()      { return _GPS_MPH_PER_KNOT * (double)value() / 100.0; }
+   double mps()      { return _GPS_MPS_PER_KNOT * (double)value() / 100.0; }
+   double kmph()     { return _GPS_KMPH_PER_KNOT * (double)value() / 100.0; }
 };
 
 struct TinyGPSCourse : public TinyGPSDecimal
 {
-   double deg()      { return value() / 100.0; }
+   double deg()      { return (double)value() / 100.0; }
 };
 
 struct TinyGPSAltitude : TinyGPSDecimal
 {
-   double meters()       { return value() / 100.0; }
-   double miles()        { return _GPS_MILES_PER_METER * value() / 100.0; }
-   double kilometers()   { return _GPS_KM_PER_METER * value() / 100.0; }
-   double feet()         { return _GPS_FEET_PER_METER * value() / 100.0; }
+   double meters()       { return (double)value() / 100.0; }
+   double miles()        { return _GPS_MILES_PER_METER * (double)value() / 100.0; }
+   double kilometers()   { return _GPS_KM_PER_METER * (double)value() / 100.0; }
+   double feet()         { return _GPS_FEET_PER_METER * (double)value() / 100.0; }
 };
 
 struct TinyGPSHDOP : TinyGPSDecimal
 {
-   double hdop() { return value() / 100.0; }
+   double hdop() { return (double)value() / 100.0; }
 };
 
 class TinyGPSPlus;
@@ -231,6 +251,7 @@ public:
   TinyGPSAltitude altitude;
   TinyGPSInteger satellites;
   TinyGPSHDOP hdop;
+  TinyGPSChar altitudeUnitsGeoid;
 
   static const char *libraryVersion() { return _GPS_VERSION; }
 
@@ -243,8 +264,15 @@ public:
 
   uint32_t charsProcessed()   const { return encodedCharCount; }
   uint32_t sentencesWithFix() const { return sentencesWithFixCount; }
+  uint32_t sentencesWithNoFix() const { return sentencesWithNoFixCount; }
   uint32_t failedChecksum()   const { return failedChecksumCount; }
   uint32_t passedChecksum()   const { return passedChecksumCount; }
+
+  char* getSentence() { return sentence; }
+  uint16_t getMaxSentenceLength() { return maxSentenceLength; }
+  uint8_t isSentenceFix() const { return (curSentenceType != GPS_SENTENCE_OTHER); }
+  uint8_t isSentenceGGA() const { return (curSentenceType == GPS_SENTENCE_GPGGA); }
+  uint8_t isSentenceRMC() const { return (curSentenceType == GPS_SENTENCE_GPRMC); }
 
 private:
   enum {GPS_SENTENCE_GPGGA, GPS_SENTENCE_GPRMC, GPS_SENTENCE_OTHER};
@@ -267,12 +295,17 @@ private:
   // statistics
   uint32_t encodedCharCount;
   uint32_t sentencesWithFixCount;
+  uint32_t sentencesWithNoFixCount;
   uint32_t failedChecksumCount;
   uint32_t passedChecksumCount;
 
   // internal utilities
   int fromHex(char a);
   bool endOfTermHandler();
+
+  static const uint16_t maxSentenceLength = 256;
+  char sentence[maxSentenceLength];
+  char* nextCharInSentence;
 };
 
 #endif // def(__TinyGPSPlus_h)

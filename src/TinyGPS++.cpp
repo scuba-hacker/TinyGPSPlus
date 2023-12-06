@@ -3,7 +3,7 @@ TinyGPS++ - a small GPS library for Arduino providing universal NMEA parsing
 Based on work by and "distanceBetween" and "courseTo" courtesy of Maarten Lamers.
 Suggestion to add satellites, courseTo(), and cardinal() by Matt Monson.
 Location precision improvements suggested by Wayne Holder.
-Copyright (C) 2008-2013 Mikal Hart
+Copyright (C) 2008-2022 Mikal Hart
 All rights reserved.
 
 This library is free software; you can redistribute it and/or
@@ -43,10 +43,13 @@ TinyGPSPlus::TinyGPSPlus()
   ,  customCandidates(0)
   ,  encodedCharCount(0)
   ,  sentencesWithFixCount(0)
+  ,  sentencesWithNoFixCount(0)
   ,  failedChecksumCount(0)
   ,  passedChecksumCount(0)
+  ,  nextCharInSentence(sentence)
 {
   term[0] = '\0';
+  sentence[0] = '\0';
 }
 
 //
@@ -55,6 +58,12 @@ TinyGPSPlus::TinyGPSPlus()
 
 bool TinyGPSPlus::encode(char c)
 {
+  *nextCharInSentence  = c;
+  nextCharInSentence++;
+
+  if (nextCharInSentence == sentence + TinyGPSPlus::maxSentenceLength)
+	nextCharInSentence--;	// buffer full, stay pointing to end
+
   ++encodedCharCount;
 
   switch(c)
@@ -74,6 +83,11 @@ bool TinyGPSPlus::encode(char c)
       ++curTermNumber;
       curTermOffset = 0;
       isChecksumTerm = c == '*';
+	  if (isValidSentence)
+	  {
+		  *nextCharInSentence = '\0'; // terminate the sentence
+		  nextCharInSentence = sentence; // reset sentence next char to start of buffer for next sentence to be store
+	  }
       return isValidSentence;
     }
     break;
@@ -116,11 +130,11 @@ int32_t TinyGPSPlus::parseDecimal(const char *term)
 {
   bool negative = *term == '-';
   if (negative) ++term;
-  int32_t ret = 100 * (int32_t)atol(term);
+  int32_t ret = 100L * (int32_t)atol(term);
   while (isdigit(*term)) ++term;
   if (*term == '.' && isdigit(term[1]))
   {
-    ret += 10 * (term[1] - '0');
+    ret += 10L * (term[1] - '0');
     if (isdigit(term[2]))
       ret += term[2] - '0';
   }
@@ -132,11 +146,11 @@ int32_t TinyGPSPlus::parseDecimal(const char *term)
 void TinyGPSPlus::parseDegrees(const char *term, RawDegrees &deg)
 {
   uint32_t leftOfDecimal = (uint32_t)atol(term);
-  uint16_t minutes = (uint16_t)(leftOfDecimal % 100);
+  uint16_t minutes = (uint16_t)(leftOfDecimal % 100UL);
   uint32_t multiplier = 10000000UL;
   uint32_t tenMillionthsOfMinutes = minutes * multiplier;
 
-  deg.deg = (int16_t)(leftOfDecimal / 100);
+  deg.deg = (int16_t)(leftOfDecimal / 100UL);
 
   while (isdigit(*term))
     ++term;
@@ -144,11 +158,11 @@ void TinyGPSPlus::parseDegrees(const char *term, RawDegrees &deg)
   if (*term == '.')
     while (isdigit(*++term))
     {
-      multiplier /= 10;
+      multiplier /= 10UL;
       tenMillionthsOfMinutes += (*term - '0') * multiplier;
     }
 
-  deg.billionths = (5 * tenMillionthsOfMinutes + 1) / 3;
+  deg.billionths = (5UL * tenMillionthsOfMinutes + 1UL) / 3UL;
   deg.negative = false;
 }
 
@@ -179,6 +193,10 @@ bool TinyGPSPlus::endOfTermHandler()
            speed.commit();
            course.commit();
         }
+		else
+		{
+			++sentencesWithNoFixCount;
+		}
         break;
       case GPS_SENTENCE_GPGGA:
         time.commit();
@@ -187,8 +205,13 @@ bool TinyGPSPlus::endOfTermHandler()
           location.commit();
           altitude.commit();
         }
+		else
+		{
+			++sentencesWithNoFixCount;
+		}
         satellites.commit();
         hdop.commit();
+		altitudeUnitsGeoid.commit();
         break;
       }
 
@@ -271,6 +294,9 @@ bool TinyGPSPlus::endOfTermHandler()
     case COMBINE(GPS_SENTENCE_GPGGA, 9): // Altitude (GPGGA)
       altitude.set(term);
       break;
+    case COMBINE(GPS_SENTENCE_GPGGA, 12): // AltitudeUnitsGeoid
+      altitudeUnitsGeoid.set(term);
+	  break;
   }
 
   // Set custom values as needed
@@ -304,7 +330,7 @@ double TinyGPSPlus::distanceBetween(double lat1, double long1, double lat2, doub
   delta = sqrt(delta);
   double denom = (slat1 * slat2) + (clat1 * clat2 * cdlong);
   delta = atan2(delta, denom);
-  return delta * 6372795;
+  return delta * 6372795.0;
 }
 
 double TinyGPSPlus::courseTo(double lat1, double long1, double lat2, double long2)
@@ -355,14 +381,14 @@ void TinyGPSLocation::setLongitude(const char *term)
 double TinyGPSLocation::lat()
 {
    updated = false;
-   double ret = rawLatData.deg + rawLatData.billionths / 1000000000.0;
+   double ret = (double)(rawLatData.deg) + (double)(rawLatData.billionths) / 1000000000.0;
    return rawLatData.negative ? -ret : ret;
 }
 
 double TinyGPSLocation::lng()
 {
    updated = false;
-   double ret = rawLngData.deg + rawLngData.billionths / 1000000000.0;
+   double ret = (double)(rawLngData.deg) + (double)(rawLngData.billionths) / 1000000000.0;
    return rawLngData.negative ? -ret : ret;
 }
 
@@ -455,6 +481,18 @@ void TinyGPSInteger::commit()
 void TinyGPSInteger::set(const char *term)
 {
    newval = atol(term);
+}
+
+void TinyGPSChar::commit()
+{
+   val = newval;
+   lastCommitTime = millis();
+   valid = updated = true;
+}
+
+void TinyGPSChar::set(const char *term)
+{
+   newval = *term;
 }
 
 TinyGPSCustom::TinyGPSCustom(TinyGPSPlus &gps, const char *_sentenceName, int _termNumber)
