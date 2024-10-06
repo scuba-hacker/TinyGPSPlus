@@ -214,6 +214,7 @@ bool TinyGPSPlus::endOfTermHandler()
           }
           satellites.commit();
           hdop.commit();
+          altitudeUnits.commit();
           altitudeUnitsGeoid.commit();
           break;
         }
