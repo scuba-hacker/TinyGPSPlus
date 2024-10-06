@@ -184,36 +184,40 @@ bool TinyGPSPlus::endOfTermHandler()
 
       switch(curSentenceType)
       {
-      case GPS_SENTENCE_GPRMC:
-        date.commit();
-        time.commit();
-        if (sentenceHasFix)
+        case GPS_SENTENCE_GPRMC:
         {
-           location.commit();
-           speed.commit();
-           course.commit();
+          date.commit();
+          time.commit();
+          if (sentenceHasFix)
+          {
+            location.commit();
+            speed.commit();
+            course.commit();
+          }
+          else
+          {
+            ++sentencesWithNoFixCount;
+          }
+          break;
         }
-		else
-		{
-			++sentencesWithNoFixCount;
-		}
-        break;
-      case GPS_SENTENCE_GPGGA:
-        time.commit();
-        if (sentenceHasFix)
+        case GPS_SENTENCE_GPGGA:
         {
-          location.commit();
-          altitude.commit();
+          time.commit();
+          if (sentenceHasFix)
+          {
+            location.commit();
+            altitude.commit();
+          }        
+          else
+          {
+            ++sentencesWithNoFixCount;
+          }
+          satellites.commit();
+          hdop.commit();
+          altitudeUnitsGeoid.commit();
+          break;
         }
-		else
-		{
-			++sentencesWithNoFixCount;
-		}
-        satellites.commit();
-        hdop.commit();
-		altitudeUnitsGeoid.commit();
-        break;
-      }
+      } 
 
       // Commit all custom listeners of this sentence type
       for (TinyGPSCustom *p = customCandidates; p != NULL && strcmp(p->sentenceName, customCandidates->sentenceName) == 0; p = p->next)
@@ -293,6 +297,9 @@ bool TinyGPSPlus::endOfTermHandler()
       break;
     case COMBINE(GPS_SENTENCE_GPGGA, 9): // Altitude (GPGGA)
       altitude.set(term);
+      break;
+    case COMBINE(GPS_SENTENCE_GPGGA, 10): // Altitude Units (GPGGA)
+      altitudeUnits.set(term);
       break;
     case COMBINE(GPS_SENTENCE_GPGGA, 12): // AltitudeUnitsGeoid
       altitudeUnitsGeoid.set(term);

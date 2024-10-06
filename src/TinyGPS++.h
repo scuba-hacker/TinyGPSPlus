@@ -248,6 +248,7 @@ public:
   TinyGPSAltitude altitude;
   TinyGPSInteger satellites;
   TinyGPSHDOP hdop;
+  TinyGPSChar altitudeUnits;
   TinyGPSChar altitudeUnitsGeoid;
 
   static const char *libraryVersion() { return _GPS_VERSION; }
