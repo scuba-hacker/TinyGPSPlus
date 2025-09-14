@@ -268,9 +268,10 @@ public:
 
   char* getSentence() { return sentence; }
   uint16_t getMaxSentenceLength() { return maxSentenceLength; }
-  uint8_t isSentenceFix() const { return (curSentenceType != GPS_SENTENCE_OTHER); }
+  uint8_t isSentenceFixMsgType() const { return (curSentenceType != GPS_SENTENCE_OTHER); }
   uint8_t isSentenceGGA() const { return (curSentenceType == GPS_SENTENCE_GPGGA); }
   uint8_t isSentenceRMC() const { return (curSentenceType == GPS_SENTENCE_GPRMC); }
+  uint8_t isSentenceContainingValidFix() const { return sentenceHasFix; }
 
 private:
   enum {GPS_SENTENCE_GPGGA, GPS_SENTENCE_GPRMC, GPS_SENTENCE_OTHER};
