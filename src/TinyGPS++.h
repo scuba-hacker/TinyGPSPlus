@@ -128,6 +128,7 @@ public:
    bool isUpdated() const  { return updated; }
    uint32_t age() const    { return valid ? millis() - lastCommitTime : (uint32_t)ULONG_MAX; }
    int32_t value()         { updated = false; return val; }
+   int32_t peek()          { return val; }
 
    TinyGPSDecimal() : valid(false), updated(false), val(0)
    {}
@@ -148,6 +149,7 @@ public:
    bool isUpdated() const  { return updated; }
    uint32_t age() const    { return valid ? millis() - lastCommitTime : (uint32_t)ULONG_MAX; }
    char value()        { updated = false; return val; }
+   char peek()         { return val; }
 
    TinyGPSChar() : valid(false), updated(false), val(0)
    {}
@@ -168,6 +170,7 @@ public:
    bool isUpdated() const  { return updated; }
    uint32_t age() const    { return valid ? millis() - lastCommitTime : (uint32_t)ULONG_MAX; }
    uint32_t value()        { updated = false; return val; }
+   uint32_t peek()         { return val; }
 
    TinyGPSInteger() : valid(false), updated(false), val(0)
    {}
