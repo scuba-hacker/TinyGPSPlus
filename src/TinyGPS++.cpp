@@ -341,6 +341,73 @@ double TinyGPSPlus::distanceBetween(double lat1, double long1, double lat2, doub
   return delta * 6372795.0;
 }
 
+// static
+// Create wrapper that uses Vincenty for short distances
+double TinyGPSPlus::distanceBetweenAccurate(double lat1, double lon1, double lat2, double lon2) {
+    // Use Vincenty for distances < 50m
+    double roughDist = TinyGPSPlus::distanceBetween(lat1, lon1, lat2, lon2);
+    if (roughDist < 50) {
+        return distanceBetweenVincenty(lat1, lon1, lat2, lon2);
+    }
+    return roughDist;
+}
+
+// static
+// Vincenty inverse formula for WGS84 ellipsoid
+// Returns distance in meters
+double TinyGPSPlus::distanceBetweenVincenty(double lat1, double lon1, double lat2, double lon2) {
+    // WGS84 ellipsoid parameters
+    const double a = 6378137.0;          // semi-major axis
+    const double f = 1.0 / 298.257223563; // flattening
+    const double b = (1.0 - f) * a;       // semi-minor axis
+
+    double L = radians(lon2 - lon1);
+    double U1 = atan((1.0 - f) * tan(radians(lat1)));
+    double U2 = atan((1.0 - f) * tan(radians(lat2)));
+    double sinU1 = sin(U1), cosU1 = cos(U1);
+    double sinU2 = sin(U2), cosU2 = cos(U2);
+
+    double lambda = L, lambdaP;
+    int iterLimit = 100;
+    double cosSqAlpha, sinSigma, cos2SigmaM, cosSigma, sigma;
+
+    do {
+        double sinLambda = sin(lambda);
+        double cosLambda = cos(lambda);
+        sinSigma = sqrt((cosU2 * sinLambda) * (cosU2 * sinLambda) +
+                        (cosU1 * sinU2 - sinU1 * cosU2 * cosLambda) *
+                        (cosU1 * sinU2 - sinU1 * cosU2 * cosLambda));
+
+        if (sinSigma == 0.0) return 0.0; // coincident points
+
+        cosSigma = sinU1 * sinU2 + cosU1 * cosU2 * cosLambda;
+        sigma = atan2(sinSigma, cosSigma);
+        double sinAlpha = cosU1 * cosU2 * sinLambda / sinSigma;
+        cosSqAlpha = 1.0 - sinAlpha * sinAlpha;
+        cos2SigmaM = cosSigma - 2.0 * sinU1 * sinU2 / cosSqAlpha;
+
+        if (isnan(cos2SigmaM)) cos2SigmaM = 0.0; // equatorial line
+
+        double C = f / 16.0 * cosSqAlpha * (4.0 + f * (4.0 - 3.0 * cosSqAlpha));
+        lambdaP = lambda;
+        lambda = L + (1.0 - C) * f * sinAlpha *
+                (sigma + C * sinSigma * (cos2SigmaM + C * cosSigma *
+                (-1.0 + 2.0 * cos2SigmaM * cos2SigmaM)));
+
+    } while (fabs(lambda - lambdaP) > 1e-12 && --iterLimit > 0);
+
+    if (iterLimit == 0) return 0.0; // formula failed to converge
+
+    double uSq = cosSqAlpha * (a * a - b * b) / (b * b);
+    double A = 1.0 + uSq / 16384.0 * (4096.0 + uSq * (-768.0 + uSq * (320.0 - 175.0 * uSq)));
+    double B = uSq / 1024.0 * (256.0 + uSq * (-128.0 + uSq * (74.0 - 47.0 * uSq)));
+    double deltaSigma = B * sinSigma * (cos2SigmaM + B / 4.0 * (cosSigma *
+                        (-1.0 + 2.0 * cos2SigmaM * cos2SigmaM) - B / 6.0 * cos2SigmaM *
+                        (-3.0 + 4.0 * sinSigma * sinSigma) * (-3.0 + 4.0 * cos2SigmaM * cos2SigmaM)));
+
+    return b * A * (sigma - deltaSigma);
+}
+
 double TinyGPSPlus::courseTo(double lat1, double long1, double lat2, double long2)
 {
   // returns course in degrees (North=0, West=270) from position 1 to position 2,

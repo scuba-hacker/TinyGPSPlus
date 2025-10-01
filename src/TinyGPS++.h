@@ -257,6 +257,8 @@ public:
   static const char *libraryVersion() { return _GPS_VERSION; }
 
   static double distanceBetween(double lat1, double long1, double lat2, double long2);
+  static double distanceBetweenAccurate(double lat1, double lon1, double lat2, double lon2);
+  static double distanceBetweenVincenty(double lat1, double lon1, double lat2, double lon2);
   static double courseTo(double lat1, double long1, double lat2, double long2);
   static const char *cardinal(double course);
 
